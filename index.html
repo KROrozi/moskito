@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>모기 지옥 (가운데 하단 발)</title>
+    <title>모기 지옥 (발 크기 키우고 하단 절반 위치)</title>
     <style>
         body {
             margin: 0;
@@ -14,20 +14,21 @@
             height: 100vh;
         }
 
-        /* [추가] 발 이미지 스타일 정의 */
+        /* [수정] 발 이미지 스타일 정의 */
         #foot-container {
             position: fixed; /* 화면에 고정 */
-            bottom: -100px;   /* 하단에 딱 붙임 (이미지 여백에 따라 조절 가능) */
+            bottom: 0;        /* 화면 바닥에 붙임 */
             left: 50%;       /* 왼쪽에서 50% 위치 */
             transform: translateX(-50%); /* 이미지 자체 너비의 반만큼 왼쪽으로 이동시켜 정확한 중앙 정렬 */
             z-index: 100;    /* 모기들보다 위에 보이도록 설정 */
             pointer-events: none; /* 발 이미지가 클릭을 막지 않도록 설정 */
+            /* opacity: 0.8; */ /* 필요하다면 약간 투명하게 설정 가능 */
         }
 
         #foot-container img {
-            width: 350px;    /* 발 이미지 너비 조절 */
+            width: 500px;    /* [수정] 발 크기 크게 증가 (기존 250px -> 500px) */
             height: auto;    /* 비율 유지 */
-            /* opacity: 0.8; */ /* 필요하다면 약간 투명하게 설정 가능 */
+            transform: translateY(50%); /* [추가] 이미지 높이의 50%만큼 아래로 이동시켜 하단 절반만 보이게 함 */
         }
 
         .mosquito {
@@ -54,7 +55,7 @@
 <body>
 
 <div id="foot-container">
-    <img src="./image/foot1.png">
+    <img src="./image/foot1.png" alt="발">
 </div>
 
 <script>
