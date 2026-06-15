@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>모기 지옥 (발 크기 키우고 하단 절반 위치)</title>
+    <title>모기 지옥 (핏자국 및 화염방사기 추가)</title>
     <style>
         body {
             margin: 0;
@@ -12,23 +12,47 @@
             overflow: hidden;
             width: 100vw;
             height: 100vh;
+            cursor: default; 
         }
 
-        /* [수정] 발 이미지 스타일 정의 */
         #foot-container {
-            position: fixed; /* 화면에 고정 */
-            bottom: 0;        /* 화면 바닥에 붙임 */
-            left: 50%;       /* 왼쪽에서 50% 위치 */
-            transform: translateX(-50%); /* 이미지 자체 너비의 반만큼 왼쪽으로 이동시켜 정확한 중앙 정렬 */
-            z-index: 100;    /* 모기들보다 위에 보이도록 설정 */
-            pointer-events: none; /* 발 이미지가 클릭을 막지 않도록 설정 */
-            /* opacity: 0.8; */ /* 필요하다면 약간 투명하게 설정 가능 */
+            position: fixed; 
+            bottom: 0;        
+            left: 50%;       
+            transform: translateX(-50%); 
+            z-index: 100;    
+            pointer-events: none; 
         }
 
         #foot-container img {
-            width: 250px;    /* [수정] 발 크기 크게 증가 (기존 250px -> 500px) */
-            height: auto;    /* 비율 유지 */
-            transform: translateY(50%); /* [추가] 이미지 높이의 50%만큼 아래로 이동시켜 하단 절반만 보이게 함 */
+            width: 500px;    
+            height: auto;    
+            transform: translateY(50%); 
+        }
+
+        #toolbar {
+            position: fixed;
+            right: 30px;
+            top: 50%;
+            transform: translateY(-50%); 
+            display: flex;
+            flex-direction: column;
+            gap: 30px; 
+            z-index: 200; 
+        }
+
+        .tool {
+            width: 65px;
+            height: 65px;
+            cursor: pointer;
+            object-fit: contain;
+            transition: all 0.2s ease;
+            filter: grayscale(100%) opacity(0.4); 
+        }
+
+        .tool.active {
+            filter: grayscale(0%) opacity(1); 
+            transform: scale(1.3); 
         }
 
         .mosquito {
@@ -41,9 +65,46 @@
             left: 0;
             transform-origin: center center;
             overflow: visible;
+            transition: filter 0.2s; 
         }
 
-        /* 날개 애니메이션 */
+        /* 튀기는 피 파티클 (사라짐) */
+        .blood {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background-color: #d30000; 
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 150;
+        }
+
+        /* [추가] 배경에 남는 영구적인 핏자국 */
+        /* [수정] 핏자국 질감을 살린 스타일 */
+        /* [수정] 질감 변경: 그라데이션 제거, 단색 사용 및 거친 경계 표현 */
+        .blood-stain {
+            position: absolute;
+            background-color: #8b0000; /* 다크 레드 단색 */
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 50;
+            transform: translate(-50%, -50%);
+            opacity: 0.9;
+            /* 질감을 위해 대비를 높이고 아주 살짝 노이즈가 섞인 듯한 느낌 부여 */
+            filter: contrast(1.5) saturate(1.2);
+        }
+
+        /* [추가] 화염방사기로 탔을 때 생기는 재 파티클 */
+        .ash {
+            position: absolute;
+            width: 5px;
+            height: 5px;
+            background-color: #222; 
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 150;
+        }
+
         .wing { transform-origin: 10px 10px; }
         .w1 { animation: flap1 0.03s infinite alternate; }
         .w2 { animation: flap2 0.03s infinite alternate; }
@@ -56,6 +117,12 @@
 
 <div id="foot-container">
     <img src="./image/foot1.png" alt="발">
+</div>
+
+<div id="toolbar">
+    <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 100 100'><text x='50%' y='50%' font-size='80' text-anchor='middle' dominant-baseline='central'>🖐️</text></svg>" alt="손" class="tool" data-type="hand">
+    <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 100 100'><text x='50%' y='50%' font-size='80' text-anchor='middle' dominant-baseline='central'>🥫</text></svg>" alt="에프킬라" class="tool" data-type="spray">
+    <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 100 100'><text x='50%' y='50%' font-size='80' text-anchor='middle' dominant-baseline='central'>🔥</text></svg>" alt="화염방사기" class="tool" data-type="flamethrower">
 </div>
 
 <script>
@@ -72,12 +139,139 @@
     `;
 
     const mosquitoes = [];
+    let currentTool = null;
+    const tools = document.querySelectorAll('.tool');
+
+    // 피 튀기는 효과 (사방으로 퍼졌다가 사라짐)
+    function createBloodSplatter(x, y) {
+        for (let i = 0; i < 6; i++) {
+            const blood = document.createElement('div');
+            blood.className = 'blood';
+            document.body.appendChild(blood);
+            
+            const angle = Math.random() * Math.PI * 2;
+            const distance = Math.random() * 40 + 20; 
+            const tx = Math.cos(angle) * distance;
+            const ty = Math.sin(angle) * distance;
+            
+            blood.style.left = `${x + 10}px`; 
+            blood.style.top = `${y + 10}px`;
+            
+            blood.animate([
+                { transform: `translate(0px, 0px) scale(1)`, opacity: 1 },
+                { transform: `translate(${tx}px, ${ty}px) scale(0)`, opacity: 0 }
+            ], {
+                duration: 400 + Math.random() * 300, 
+                easing: 'cubic-bezier(0.25, 1, 0.5, 1)', 
+                fill: 'forwards'
+            }).onfinish = () => blood.remove(); 
+        }
+    }
+
+    // [추가] 화면에 영구적으로 남는 핏자국 생성
+    // [수정] 핏자국을 여러 파편으로 나누어 더 리얼하게 생성
+    // [수정] 핏방울 파편 크기를 훨씬 더 작게 조정
+function createBloodStain(x, y) {
+    const numSplats = 12 + Math.floor(Math.random() * 8); // 파편 개수를 늘림
+    for (let i = 0; i < numSplats; i++) {
+        const stain = document.createElement('div');
+        stain.className = 'blood-stain';
+        
+        // 중앙에서 흩어지는 범위는 넓히되, 크기는 1~3px로 매우 작게 설정
+        const angle = Math.random() * Math.PI * 2;
+        const distance = Math.random() * 40; 
+        const offsetX = Math.cos(angle) * distance;
+        const offsetY = Math.sin(angle) * distance;
+        
+        const size = Math.random() * 2 + 1; // 1px ~ 3px 사이의 초미세 파편
+        
+        stain.style.width = `${size}px`;
+        stain.style.height = `${size}px`;
+        stain.style.left = `${x + 10 + offsetX}px`;
+        stain.style.top = `${y + 10 + offsetY}px`;
+        
+        document.body.appendChild(stain);
+    }
+}
+    // [추가] 화염방사기로 탔을 때 바스라지는 재(Ash) 효과
+    function createAshParticles(x, y) {
+        for (let i = 0; i < 8; i++) {
+            const ash = document.createElement('div');
+            ash.className = 'ash';
+            document.body.appendChild(ash);
+            
+            const angle = Math.random() * Math.PI * 2;
+            const distance = Math.random() * 20 + 10; 
+            const tx = Math.cos(angle) * distance;
+            const ty = Math.sin(angle) * distance + 30; // 아래로 조금 떨어지게
+            
+            ash.style.left = `${x + 10}px`; 
+            ash.style.top = `${y + 10}px`;
+            
+            ash.animate([
+                { transform: `translate(0px, 0px) scale(1)`, opacity: 1 },
+                { transform: `translate(${tx}px, ${ty}px) scale(0)`, opacity: 0 }
+            ], {
+                duration: 600 + Math.random() * 400, 
+                easing: 'ease-out', 
+                fill: 'forwards'
+            }).onfinish = () => ash.remove(); 
+        }
+    }
+
+    tools.forEach(tool => {
+        tool.addEventListener('click', (e) => {
+            e.stopPropagation(); 
+
+            if (tool.classList.contains('active')) {
+                tool.classList.remove('active');
+                currentTool = null;
+                document.body.style.cursor = 'default';
+            } else {
+                tools.forEach(t => t.classList.remove('active'));
+                tool.classList.add('active');
+                currentTool = tool.dataset.type;
+                
+                const imgSrc = tool.getAttribute('src');
+                document.body.style.cursor = `url("${imgSrc}") 20 20, crosshair`; 
+            }
+        });
+    });
+
+    window.addEventListener('click', (e) => {
+        if (!currentTool) return; 
+
+        const clickX = e.clientX;
+        const clickY = e.clientY;
+
+        let hitRadius = 0;
+        if (currentTool === 'hand') hitRadius = 40;     
+        if (currentTool === 'spray') hitRadius = 150;   
+        if (currentTool === 'flamethrower') hitRadius = 100; // [수정] 화염방사기 범위
+
+        mosquitoes.forEach(mq => {
+            if (mq.isDead) return; 
+
+            const dx = (mq.x + 10) - clickX; 
+            const dy = (mq.y + 10) - clickY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance <= hitRadius) {
+                mq.die(currentTool);
+            }
+        });
+    });
 
     class Mosquito {
         constructor() {
             this.element = document.createElement('div');
             this.element.className = 'mosquito';
             this.element.innerHTML = mosquitoSVG;
+
+            this.isDead = false;
+            this.deathTool = null;
+            this.deathTimer = 0;
+            this.isRemovable = false; 
 
             const margin = 50; 
             const edge = Math.floor(Math.random() * 4); 
@@ -105,11 +299,71 @@
             }
             
             this.dartTimer = Math.random() * 50 + 20;
-
             document.body.appendChild(this.element);
         }
 
+        die(tool) {
+            this.isDead = true;
+            this.deathTool = tool;
+            this.deathTimer = 0;
+            
+            const wings = this.element.querySelectorAll('.wing');
+            wings.forEach(w => w.style.animation = 'none');
+            
+            if (tool === 'hand') {
+                createBloodSplatter(this.x, this.y); // 순간적으로 튀는 피
+                createBloodStain(this.x, this.y);    // 배경에 남는 영구적인 핏자국
+            } else if (tool === 'flamethrower') {
+                // [추가] 화염방사기 타격 즉시 새까맣게 변하게 함
+                this.element.style.filter = "brightness(0) drop-shadow(0 0 5px red)";
+            }
+        }
+
         update() {
+            if (this.isDead) {
+                this.deathTimer++;
+                
+                if (this.deathTool === 'hand') {
+                    // 손(파리채)
+                    this.y += 15;
+                    this.element.style.transform = `translate(${this.x}px, ${this.y}px) scale(1.2, 0.1)`;
+                
+                } else if (this.deathTool === 'spray') {
+                    // 에프킬라
+                    if (this.deathTimer < 90) {
+                        this.x += (Math.random() - 0.5) * 20;
+                        this.y += (Math.random() - 0.5) * 15 + 1; 
+                        this.element.style.transform = `translate(${this.x}px, ${this.y}px) rotate(${Math.random() * 360}deg) scale(0.9)`;
+                    } else {
+                        this.y += 15;
+                        this.element.style.transform = `translate(${this.x}px, ${this.y}px) rotate(180deg) scale(0.8)`;
+                    }
+                
+                } else if (this.deathTool === 'flamethrower') {
+                    // [추가] 화염방사기 연출
+                    if (this.deathTimer < 30) {
+                        // 1단계: 30프레임(약 0.5초) 동안 그 자리에서 멈춰서 새까맣게 탄 채로 지글지글 떨림
+                        const jitterX = (Math.random() - 0.5) * 4;
+                        const jitterY = (Math.random() - 0.5) * 4;
+                        this.element.style.transform = `translate(${this.x + jitterX}px, ${this.y + jitterY}px) scale(0.9)`;
+                    } else if (this.deathTimer === 30) {
+                        // 2단계: 30프레임이 되는 순간 재(파티클)로 바스라지고 모기 몸체는 화면에서 안 보이게 처리
+                        createAshParticles(this.x, this.y);
+                        this.element.style.display = 'none';
+                    } else if (this.deathTimer > 60) {
+                        // 3단계: 충분히 재가 흩어진 후 메모리에서 삭제 예약
+                        this.y = window.innerHeight + 100; // 삭제 트리거 발동을 위해 위치를 강제로 내림
+                    }
+                }
+
+                if (this.y > window.innerHeight + 50) {
+                    this.isRemovable = true;
+                    this.element.remove();
+                }
+                return; 
+            }
+
+            // 기존 생존 비행
             this.dartTimer--;
 
             if (this.dartTimer <= 0) {
@@ -117,13 +371,11 @@
                 const dartForce = Math.random() * 10 + 5;
                 this.vx += Math.cos(dartAngle) * dartForce;
                 this.vy += Math.sin(dartAngle) * dartForce;
-                
                 this.dartTimer = Math.random() * 60 + 20;
             }
 
             this.vx += (Math.random() - 0.5) * 2;
             this.vy += (Math.random() - 0.5) * 2;
-
             this.vx *= 0.88;
             this.vy *= 0.88;
 
@@ -149,18 +401,22 @@
     }
 
     function animate() {
-        for (let i = 0; i < mosquitoes.length; i++) {
+        for (let i = mosquitoes.length - 1; i >= 0; i--) {
             mosquitoes[i].update();
+            if (mosquitoes[i].isRemovable) {
+                mosquitoes.splice(i, 1);
+            }
         }
         requestAnimationFrame(animate);
     }
 
     setInterval(() => {
-        mosquitoes.push(new Mosquito());
-    }, 5000);
+        if(mosquitoes.length < 30) {
+            mosquitoes.push(new Mosquito());
+        }
+    }, 3000); 
 
     mosquitoes.push(new Mosquito());
-    
     animate();
 </script>
 
